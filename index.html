@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Snake Game</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: rgb(9, 56, 19);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Courier New', monospace;
+      touch-action: none;
+    }
+
+    h1 {
+      color: #00ff88;
+      font-size: 22px;
+      letter-spacing: 6px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      text-shadow: 0 0 20px rgba(0,255,136,0.4);
+    }
+
+    #score-board {
+      color: #00ff88;
+      font-size: 13px;
+      letter-spacing: 3px;
+      margin-bottom: 14px;
+      opacity: 0.8;
+    }
+
+    #wrapper {
+      position: relative;
+    }
+
+    #board {
+      width: 400px;
+      height: 400px;
+      background: #0d0d1a;
+      border: 2px solid #00ff88;
+      display: grid;
+      grid-template-columns: repeat(20, 1fr);
+      grid-template-rows: repeat(20, 1fr);
+      box-shadow: 0 0 40px rgba(0,255,136,0.15), inset 0 0 40px rgba(0,0,0,0.5);
+    }
+
+    .snake-cell {
+      background: rgb(182, 238, 11);
+      border-radius: 2px;
+      transition: background 0.05s;
+    }
+
+    .snake-head {
+      background: yellow;
+      border-radius: 3px;
+      box-shadow: 0 0 8px rgba(0,255,136,0.6);
+    }
+
+    .food-cell {
+      background: red;
+      border-radius: 50%;
+      box-shadow: 0 0 10px rgba(255,71,87,0.7);
+      animation: pulse 0.8s ease-in-out infinite alternate;
+    }
+
+    @keyframes pulse {
+      from { transform: scale(0.8); opacity: 0.8; }
+      to   { transform: scale(1.0); opacity: 1; }
+    }
+
+    #overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(10,10,20,0.88);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+    }
+
+    #overlay.show { display: flex; }
+
+    #overlay-title {
+      color: #ff4757;
+      font-size: 20px;
+      letter-spacing: 4px;
+    }
+
+    #overlay-score {
+      color: #00ff88;
+      font-size: 13px;
+      letter-spacing: 2px;
+      opacity: 0.75;
+    }
+
+    #restart-btn {
+      margin-top: 6px;
+      background: transparent;
+      border: 1.5px solid #00ff88;
+      color: #00ff88;
+      padding: 10px 28px;
+      cursor: pointer;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      letter-spacing: 3px;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    #restart-btn:hover {
+      background: #00ff88;
+      color: #0d0d1a;
+    }
+
+    /* D-PAD */
+    .dpad {
+      display: grid;
+      grid-template-columns: repeat(3, 60px);
+      grid-template-rows: repeat(3, 60px);
+      gap: 5px;
+      margin-top: 22px;
+    }
+
+    .dpad-btn {
+      width: 60px;
+      height: 60px;
+      background: rgba(0, 255, 136, 0.07);
+      border: 1.5px solid rgba(0, 255, 136, 0.3);
+      color: #00ff88;
+      font-size: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      border-radius: 10px;
+      user-select: none;
+      -webkit-user-select: none;
+      transition: background 0.1s, transform 0.1s, border-color 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .dpad-btn:active,
+    .dpad-btn.pressed {
+      background: rgba(0, 255, 136, 0.22);
+      border-color: #00ff88;
+      transform: scale(0.91);
+    }
+
+    .dpad-center {
+      background: rgba(0, 255, 136, 0.03);
+      border-color: rgba(0, 255, 136, 0.08);
+      cursor: default;
+      pointer-events: none;
+    }
+
+    .dpad-empty {
+      visibility: hidden;
+    }
+
+    #hint {
+      margin-top: 14px;
+      color: rgba(0,255,136,0.35);
+      font-size: 11px;
+      letter-spacing: 2px;
+    }
+
+    @media (max-width: 440px) {
+      #board { width: 320px; height: 320px; }
+      .dpad { grid-template-columns: repeat(3, 56px); grid-template-rows: repeat(3, 56px); }
+      .dpad-btn { width: 56px; height: 56px; font-size: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Snake</h1>
+  <div id="score-board">SCORE: <span id="score">0</span>| BEST: <span id="best">0</span></div>
+
+  <div id="wrapper">
+    <div id="board"></div>
+    <div id="overlay">
+      <div id="overlay-title">GAME OVER</div>
+      <div id="overlay-score"></div>
+      <button id="restart-btn">PLAY AGAIN</button>
+    </div>
+  </div>
+
+  <!-- Virtual D-Pad -->
+  <div class="dpad">
+    <div class="dpad-empty"></div>
+    <button class="dpad-btn" id="btn-up"    aria-label="Up">&#9650;</button>
+    <div class="dpad-empty"></div>
+
+    <button class="dpad-btn" id="btn-left"  aria-label="Left">&#9664;</button>
+    <div class="dpad-btn dpad-center"></div>
+    <button class="dpad-btn" id="btn-right" aria-label="Right">&#9654;</button>
+
+    <div class="dpad-empty"></div>
+    <button class="dpad-btn" id="btn-down"  aria-label="Down">&#9660;</button>
+    <div class="dpad-empty"></div>
+  </div>
+
+  <div id="hint">Arrow keys or D-pad to move</div>
+
+<script>
+  const COLS = 20, ROWS = 20;
+  const board = document.getElementById('board');
+  const scoreEl = document.getElementById('score');
+  const bestEl  = document.getElementById('best');
+  const overlay = document.getElementById('overlay');
+  const overlayScore = document.getElementById('overlay-score');
+
+  let snake, dir, nextDir, food, score, best, gameLoop, running;
+  best = parseInt(localStorage.getItem('snake_best') || '0');
+  bestEl.textContent = best;
+
+  function init() {
+    snake   = [{x:10,y:10},{x:9,y:10},{x:8,y:10}];
+    dir     = {x:1, y:0};
+    nextDir = {x:1, y:0};
+    score   = 0;
+    running = true;
+    scoreEl.textContent = 0;
+    overlay.classList.remove('show');
+    placeFood();
+    clearInterval(gameLoop);
+    gameLoop = setInterval(tick, 120);
+    render();
+  }
+
+  function placeFood() {
+    let pos;
+    do {
+      pos = { x: Math.floor(Math.random() * COLS), y: Math.floor(Math.random() * ROWS) };
+    } while (snake.some(s => s.x === pos.x && s.y === pos.y));
+    food = pos;
+  }
+
+  function tick() {
+    dir = nextDir;
+    const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+
+    // Wall collision
+    if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) return endGame();
+    // Self collision
+    if (snake.some(s => s.x === head.x && s.y === head.y)) return endGame();
+
+    snake.unshift(head);
+
+    if (head.x === food.x && head.y === food.y) {
+      score++;
+      scoreEl.textContent = score;
+      if (score > best) {
+        best = score;
+        bestEl.textContent = best;
+        localStorage.setItem('snake_best', best);
+      }
+      placeFood();
+    } else {
+      snake.pop();
+    }
+
+    render();
+  }
+
+  function endGame() {
+    clearInterval(gameLoop);
+    running = false;
+    overlayScore.textContent = 'SCORE: ' + score;
+    overlay.classList.add('show');
+  }
+
+  function render() {
+    board.innerHTML = '';
+    // Draw food
+    const f = document.createElement('div');
+    f.className = 'food-cell';
+    f.style.cssText = `grid-column:${food.x+1};grid-row:${food.y+1};`;
+    board.appendChild(f);
+    // Draw snake
+    snake.forEach((s, i) => {
+      const el = document.createElement('div');
+      el.className = i === 0 ? 'snake-head' : 'snake-cell';
+      el.style.cssText = `grid-column:${s.x+1};grid-row:${s.y+1};opacity:${i === 0 ? 1 : Math.max(0.4, 1 - i * 0.035)};`;
+      board.appendChild(el);
+    });
+  }
+
+  function setDir(dx, dy) {
+    if (!running) return;
+    if (dx === 1  && dir.x === -1) return;
+    if (dx === -1 && dir.x ===  1) return;
+    if (dy === 1  && dir.y === -1) return;
+    if (dy === -1 && dir.y ===  1) return;
+    nextDir = { x: dx, y: dy };
+  }
+
+  // Keyboard controls
+  document.addEventListener('keydown', e => {
+    const map = {
+      ArrowUp:    [0, -1],
+      ArrowDown:  [0,  1],
+      ArrowLeft:  [-1, 0],
+      ArrowRight: [1,  0],
+      w: [0,-1], s: [0,1], a: [-1,0], d: [1,0]
+    };
+    if (map[e.key]) { e.preventDefault(); setDir(...map[e.key]); }
+  });
+
+  // Virtual D-pad controls
+  function bindDpadBtn(id, dx, dy) {
+    const btn = document.getElementById(id);
+
+    const onPress = (e) => {
+      e.preventDefault();
+      setDir(dx, dy);
+      btn.classList.add('pressed');
+      setTimeout(() => btn.classList.remove('pressed'), 130);
+    };
+
+    btn.addEventListener('touchstart', onPress, { passive: false });
+    btn.addEventListener('mousedown',  onPress);
+  }
+
+  bindDpadBtn('btn-up',    0, -1);
+  bindDpadBtn('btn-down',  0,  1);
+  bindDpadBtn('btn-left', -1,  0);
+  bindDpadBtn('btn-right', 1,  0);
+
+  document.getElementById('restart-btn').addEventListener('click', init);
+
+  init();
+</script>
+</body>
+</html>
